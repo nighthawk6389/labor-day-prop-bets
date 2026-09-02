@@ -18,9 +18,29 @@ import postgres from 'postgres'
 import { sql as raw } from 'drizzle-orm'
 import * as schema from './schema'
 import { seedBoard, CODES } from './seedBoard'
-import { resolveDbUrl } from '../lib/dbUrl'
+import { resolveDbUrl, hasDbUrl } from '../lib/dbUrl'
 
 async function main() {
+  // A build with no database configured still has to produce something.
+  // On production that is a real misconfiguration and should stop the deploy
+  // loudly. On a preview it usually just means the integration is scoped to
+  // production, and failing there would redden every pull request for a
+  // reason that has nothing to do with the change.
+  if (!hasDbUrl()) {
+    const where = process.env.VERCEL_ENV ?? 'local'
+    const wanted = 'POSTGRES_URL (runtime) and POSTGRES_URL_NON_POOLING (migrations)'
+    if (where === 'production') {
+      throw new Error(
+        `No database connection string on a production deploy.\n` +
+          `Add ${wanted} in the Vercel project's environment variables — ` +
+          `the Postgres/Supabase integration sets both — then redeploy.`,
+      )
+    }
+    console.log(`! no database configured for this ${where} build — skipping setup`)
+    console.log(`  the app will need ${wanted} to serve requests`)
+    return
+  }
+
   // DDL must not go through a transaction-mode pooler.
   const url = resolveDbUrl('migration')
   const host = url.replace(/\/\/[^@]*@/, '//***@')

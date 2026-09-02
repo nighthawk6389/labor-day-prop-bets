@@ -49,3 +49,8 @@ export function resolveDbUrl(mode: 'runtime' | 'migration'): string {
 export function isPooled(url: string): boolean {
   return url.includes('pgbouncer=true') || url.includes(':6543') || url.includes('-pooler.')
 }
+
+/** Whether any usable connection string is configured at all. */
+export function hasDbUrl(): boolean {
+  return [...RUNTIME_VARS, ...MIGRATION_VARS].some((n) => !!process.env[n])
+}
