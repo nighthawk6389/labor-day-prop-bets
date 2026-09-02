@@ -8,7 +8,10 @@
     "start": "next start",
     "seed": "tsx db/seed.ts",
     "db:push": "drizzle-kit push",
-    "test": "vitest run"
+    "test": "vitest run",
+    "vercel-build": "tsx db/deploy.ts && next build",
+    "db:generate": "drizzle-kit generate",
+    "db:deploy": "tsx db/deploy.ts"
   },
   "dependencies": {
     "bcryptjs": "3.0.2",

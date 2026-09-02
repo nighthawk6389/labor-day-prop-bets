@@ -8,10 +8,10 @@ export async function login(_prev: unknown, form: FormData) {
   const pin = String(form.get('pin') ?? '').trim()
 
   if (!playerId) return { error: 'Pick your name first.' }
-  if (!/^\d{4}$/.test(pin)) return { error: 'PIN is four digits.' }
+  if (!/^\d{2}$/.test(pin)) return { error: 'Your code is two digits.' }
 
   const session = await verifyPin(playerId, pin)
-  if (!session) return { error: 'Wrong PIN. Ask Ilan.' }
+  if (!session) return { error: 'Wrong code. Ask Ilan.' }
 
   await createSession(session)
   redirect('/')
