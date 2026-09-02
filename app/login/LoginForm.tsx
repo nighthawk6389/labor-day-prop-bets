@@ -39,16 +39,16 @@ export function LoginForm({ players }: { players: P[] }) {
           htmlFor="pin"
           className="mb-2 block text-xs font-medium tracking-wide text-mute uppercase"
         >
-          Your 4-digit PIN
+          Your 2-digit code
         </label>
         <input
           id="pin"
           name="pin"
           inputMode="numeric"
           autoComplete="off"
-          maxLength={4}
-          placeholder="••••"
-          className="w-full rounded-xl border border-line bg-panel px-4 py-3 text-center text-2xl tracking-[0.5em] tabular-nums outline-none focus:border-court"
+          maxLength={2}
+          placeholder="••"
+          className="w-full rounded-xl border border-line bg-panel px-4 py-3 text-center text-2xl tracking-[0.4em] tabular-nums outline-none focus:border-court"
         />
       </div>
 

@@ -47,34 +47,75 @@ Anyone can file, one person rules. It makes everyone actually listen all weekend
 
 ## Deploy
 
-1. Push this repo to GitHub.
-2. Import it at [vercel.com/new](https://vercel.com/new).
-3. In the project, **Storage → Create Database → Postgres** (Neon). Vercel injects
-   `DATABASE_URL` automatically.
-4. Add one more env var: `AUTH_SECRET` — any long random string.
-   Generate one with `openssl rand -base64 32`.
-5. Deploy. Then push the schema and seed the board:
+The build sets up its own database. Push to GitHub, import to Vercel, and the first deploy
+migrates the schema and seeds the board — no connection string, no local terminal.
 
-   ```bash
-   export DATABASE_URL="<the connection string from Vercel>"
-   npm run db:push
-   npm run seed
-   ```
+1. Import the repo at [vercel.com/new](https://vercel.com/new).
+2. Connect Postgres. **Storage → Create Database** (or link an existing Supabase/Neon
+   project). The integration injects the connection strings.
+3. Add one env var of your own: `AUTH_SECRET` — any long random string.
+   `openssl rand -base64 32` produces one.
+4. Deploy.
 
-   The seed prints everyone's 4-digit PIN **once**. Text them out — they are hashed in the
-   database and can't be recovered. Re-run with `npm run seed -- --new-pins` to reissue.
+`vercel-build` runs `db/deploy.ts` before `next build`, which applies migrations and seeds
+the board. Vercel prefers `vercel-build` over `build`, so a local `npm run build` stays
+database-free.
+
+### Connection strings
+
+Managed Postgres hands out two URLs and **they are not interchangeable**:
+
+| Variable | Port | Used for |
+|---|---|---|
+| `POSTGRES_URL` | `:6543` transaction pooler | Runtime. Serverless opens many short connections |
+| `POSTGRES_URL_NON_POOLING` | `:5432` session mode | Migrations. DDL through a transaction pooler fails |
+
+`DATABASE_URL` / `DATABASE_URL_UNPOOLED` work as aliases. Two consequences are handled in
+`lib/dbUrl.ts` and worth knowing before debugging anything:
+
+- Transaction-mode poolers **do not support prepared statements**, which postgres.js opens
+  by default. The client passes `prepare: false` on a pooled URL. Without it the app
+  connects fine and then fails on real queries.
+- Supabase's session-mode host also contains the word "pooler"
+  (`aws-1-...pooler.supabase.com:5432`). The detection deliberately matches `-pooler.` with
+  a hyphen so Neon's pooled endpoint is caught while Supabase's session URL is not.
+  Loosening it would silently disable prepared statements everywhere.
+
+### The reseed guard
+
+Seeding wipes the ledger, so running it on every deploy would erase everyone's bets. The
+deploy script **seeds only when no bets exist yet**:
+
+- **Before anyone bets** — every deploy reseeds. Edit `content/markets.ts`, push, and the
+  new card is live. Tune freely.
+- **After the first real bet** — seeding is skipped and the board is left alone. It freezes
+  itself at exactly the right moment.
+- `FORCE_RESEED=1` overrides it for a deliberate wipe.
+
+## Login codes
+
+Two digits each, in `content/players.ts`. Text them out.
+
+| | | |
+|---|---|---|
+| Ilan Elkobi **47** | Chaim **82** | Brian Wiener **19** |
+| Yona **63** | Moshe Fox **58** | Oren Feder **91** |
+| Netanel Heiser **36** | Justin **74** | Mikey **25** |
+
+Change one and redeploy and it applies — as long as nobody has bet yet. Two digits is 100
+combinations, so this keeps honest men honest and no more; it is play money on a private
+URL.
 
 ### Local
 
 ```bash
 npm install
 cp .env.example .env      # point DATABASE_URL at any Postgres
-npm run db:push
-npm run seed
+npm run db:deploy         # migrate + seed, same as the build hook
 npm run dev
 ```
 
----
+`npm run seed` also exists and rebuilds the board unconditionally, ignoring the guard.
 
 ## The card
 
@@ -124,6 +165,8 @@ never touches payments; it just does the math.
 npm test
 ```
 
-Covers the pool math in `lib/parimutuel.ts` — proportional splits, early-bird weighting,
-zero-winner voids, integer rounding, and a 300-board fuzz test asserting the pot is always
-conserved to the unit.
+17 tests. `lib/parimutuel.ts` covers the pool math — proportional splits, early-bird
+weighting, zero-winner voids, integer rounding, and a 300-board fuzz test asserting the pot
+is always conserved to the unit. `lib/dbUrl.ts` covers connection-string resolution against
+the real URL shapes Supabase and Neon hand out, including the pooled/session distinction
+that decides whether prepared statements are safe.
